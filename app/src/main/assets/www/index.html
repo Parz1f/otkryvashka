@@ -226,7 +226,12 @@ const CDN = {
   pptx: ['https://cdn.jsdelivr.net/npm/pptx-preview@1.0.7/dist/pptx-preview.umd.js'],
 };
 // Inside the Android app the libraries ship with the APK, so documents open offline.
-const IN_APP = location.hostname === 'appassets.androidplatform.net';
+// RUST — версия на Tauri: распознавание форматов и чтение .doc там делает код на Rust.
+const RUST = !!(window.__TAURI__ && window.__TAURI__.core);
+const IN_APP = RUST || location.hostname === 'appassets.androidplatform.net';
+const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
+// Сколько байтов отдавать в Rust: на Android они идут JSON-массивом, большие файлы это тормозит.
+const RUST_MAX_BYTES = 16 * 1048576;
 const loading = {};
 function loadScript(src) {
   if (IN_APP) src = 'libs/' + src.split('/').pop();
@@ -251,6 +256,9 @@ const TYPES = {
   audio: { label: 'Аудио', color: 'var(--other)' },
   text:  { label: 'Текст', color: 'var(--other)' },
   rtf:   { label: 'RTF',  color: 'var(--doc)' },
+  'ppt-old': { label: 'PPT', color: 'var(--ppt)' },
+  odt:   { label: 'ODT',  color: 'var(--doc)' },
+  encrypted: { label: 'Пароль', color: 'var(--muted)' },
   unknown: { label: 'Файл', color: 'var(--muted)' },
 };
 const EXT = {
@@ -276,6 +284,13 @@ function byExt(name, mime) {
   return 'unknown';
 }
 // Files from messengers often come without an extension, so look at the first bytes too.
+async function rustSniff(buf) {
+  if (!RUST || buf.byteLength > RUST_MAX_BYTES) return sniff(buf);
+  try {
+    const k = await invoke('detect_format', buf);
+    return k === 'unknown' ? null : k;
+  } catch (e) { console.warn('detect_format', e); return sniff(buf); }
+}
 async function sniff(buf) {
   const b = new Uint8Array(buf.slice(0, 8));
   const str = String.fromCharCode(...b);
@@ -370,6 +385,7 @@ function home() {
         <div style="--tc:var(--muted)"><b><i></i>Текст и код</b><span>.txt · .json · .xml · .md</span></div>
       </div>
     </div>
+    ${RUST ? '<p class="note">Версия на Rust: формат файла и текст старых документов .doc распознаёт код на Rust.</p>' : ''}
     <p class="note">Старые форматы .doc показываются без оформления, только текст. Файлы с другими расширениями открываются как текст или в виде байтов.</p>
   </div>`;
   const drop = $('#drop');
@@ -380,7 +396,7 @@ function home() {
 }
 
 /* ---------- Open a file ---------- */
-async function openFile(file) {
+async function openFile(file, knownKind) {
   reset();
   state.file = file;
   let kind = byExt(file.name, file.type || '');
@@ -388,14 +404,15 @@ async function openFile(file) {
   status('Открываю файл…', file.name, true);
   try {
     const buf = await file.arrayBuffer();
-    if (kind === 'unknown' || kind === 'text' || kind === 'doc') {
-      const s = await sniff(buf);
+    if (knownKind && knownKind !== 'unknown') kind = knownKind;
+    else if (kind === 'unknown' || kind === 'text' || kind === 'doc') {
+      const s = await rustSniff(buf);
       if (s === 'ole') { if (kind !== 'doc' && /\.(xls|xlt)$/i.test(file.name) === false) kind = kind === 'unknown' ? 'ole' : kind; }
       else if (s) kind = s;
     }
     if (kind === 'ole') kind = await guessOle(buf);
     showHeader(file, kind);
-    const run = { pdf: showPdf, docx: showDocx, doc: showDoc, sheet: showSheet, pptx: showPptx, image: showImage, video: showMedia, audio: showMedia, text: showText, rtf: showRtf }[kind] || showUnknown;
+    const run = { 'ppt-old': showUnsupported, odt: showUnsupported, encrypted: showUnsupported, pdf: showPdf, docx: showDocx, doc: showDoc, sheet: showSheet, pptx: showPptx, image: showImage, video: showMedia, audio: showMedia, text: showText, rtf: showRtf }[kind] || showUnknown;
     await run(buf, file, kind);
   } catch (err) {
     console.error(err);
@@ -497,7 +514,15 @@ async function showDocx(buf) {
 
 /* ---------- Old Word (.doc): text only ---------- */
 async function showDoc(buf) {
-  const text = extractDocText(new Uint8Array(buf));
+  let text = '';
+  if (RUST && buf.byteLength <= RUST_MAX_BYTES) {
+    try { text = await invoke('doc_text', buf); }
+    catch (e) {
+      if (String(e).includes('паролем')) throw new Error('Документ защищён паролем. Снимите пароль в Word и откройте снова.');
+      console.warn('doc_text', e);
+    }
+  }
+  if (!text.trim()) text = extractDocText(new Uint8Array(buf));
   if (!text.trim()) throw new Error('Не удалось извлечь текст из этого .doc файла. Пересохраните его в формате .docx.');
   view.innerHTML = `<div class="banner">Старый формат Word: показан только текст, без оформления и картинок.</div><div class="textview" style="font-family:var(--font-ui);font-size:15px">${esc(text)}</div>`;
 }
@@ -656,6 +681,16 @@ async function showRtf(buf) {
   view.innerHTML = `<div class="banner">RTF: показан текст документа без оформления.</div><div class="textview" style="font-family:var(--font-ui);font-size:15px">${esc(s)}</div>`;
 }
 
+/* ---------- Formats we recognise but cannot show ---------- */
+async function showUnsupported(buf, file, kind) {
+  const msg = {
+    'ppt-old': ['Старая презентация PowerPoint', 'Формат .ppt (PowerPoint 97–2003) пока не открывается. Пересохраните презентацию в .pptx.'],
+    odt: ['Документ OpenDocument', 'Формат .odt пока не открывается. Сохраните документ в .docx в LibreOffice или Word.'],
+    encrypted: ['Файл защищён паролем', 'Снимите пароль в программе, где создан файл, и откройте его снова.'],
+  }[kind];
+  status(msg[0], msg[1]);
+}
+
 /* ---------- Anything else ---------- */
 async function showUnknown(buf, file) {
   const b = new Uint8Array(buf);
@@ -774,8 +809,22 @@ window.appBack = () => {
   home();
   return true;
 };
+// Версия на Tauri: файл из «Открыть с помощью» MainActivity.kt кладёт в кэш, а Rust отдаёт его сюда.
+window.checkIncoming = async () => {
+  if (!RUST) return;
+  try {
+    const info = await invoke('incoming_info');
+    if (!info) return;
+    const bytes = await invoke('take_incoming');
+    openFile(new File([bytes], info.name || 'Файл', { type: info.mime || '' }), info.kind);
+  } catch (e) { status('Не получилось открыть файл', String(e)); }
+};
+if (RUST && window.__TAURI__.app && window.__TAURI__.app.onBackButtonPress) {
+  window.__TAURI__.app.onBackButtonPress(() => { if (!window.appBack()) invoke('quit'); });
+}
 
 home();
+window.checkIncoming();
 })();
 </script>
 

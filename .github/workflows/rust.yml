@@ -1,0 +1,92 @@
+name: Сборка APK (Rust)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'rust/**'
+      - 'web/**'
+      - 'app/src/main/assets/www/**'
+      - '.github/workflows/rust.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - name: Тесты Rust
+        run: cargo test -p otkryvashka-core
+
+  android:
+    needs: test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Rust для Android
+        run: rustup target add aarch64-linux-android armv7-linux-androideabi
+
+      - name: Android NDK
+        run: echo "NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+
+      - name: Номер версии
+        run: |
+          jq '.version = "1.0.${{ github.run_number }}"' src-tauri/tauri.conf.json > conf.tmp
+          mv conf.tmp src-tauri/tauri.conf.json
+
+      - name: Создать Android-проект (если его ещё нет)
+        run: |
+          if [ ! -d src-tauri/gen/android ]; then
+            npx -y @tauri-apps/cli@2.12.1 android init --ci
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gen-android
+          path: |
+            rust/src-tauri/gen/android
+            !rust/src-tauri/gen/android/**/build
+            !rust/src-tauri/gen/android/.gradle
+
+      - name: Собрать APK
+        run: npx -y @tauri-apps/cli@2.12.1 android build --apk --target aarch64 armv7 --ci
+
+      - name: Подписать
+        run: |
+          TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          APK=$(find src-tauri/gen/android/app/build/outputs/apk -name '*release*.apk' | head -1)
+          "$TOOLS/zipalign" -f -p 4 "$APK" aligned.apk
+          "$TOOLS/apksigner" sign --ks ../app/otkryvashka.jks --ks-pass pass:otkryvashka --key-pass pass:otkryvashka --out Otkryvashka-Rust.apk aligned.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Otkryvashka-Rust
+          path: rust/Otkryvashka-Rust.apk
+
+      - name: Опубликовать
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: rust-latest
+          name: Открывашка на Rust
+          body: Версия на Rust (Tauri). Сборка 1.0.${{ github.run_number }}.
+          files: rust/Otkryvashka-Rust.apk
+          make_latest: false

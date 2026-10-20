@@ -1,0 +1,9 @@
+[package]
+name = "otkryvashka-core"
+version = "0.1.0"
+edition = "2021"
+description = "Распознавание форматов файлов и извлечение текста из старых документов Word"
+
+[dependencies]
+cfb = "0.14"
+zip = { version = "8.6", default-features = false, features = ["deflate"] }

@@ -3,6 +3,9 @@ name: Сборка APK
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'rust/**'
+      - '.github/workflows/rust.yml'
   workflow_dispatch:
 
 permissions:
