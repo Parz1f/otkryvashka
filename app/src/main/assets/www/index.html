@@ -166,8 +166,7 @@ table.grid { border-collapse: separate; border-spacing: 0; font-size: 13.5px; fo
 .slides { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
 .slide { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; max-width: 100%; }
 .pptx-host { overflow-x: auto; }
-.pptx-host .pptx-preview-wrapper { height: auto !important; overflow: visible !important; background: transparent !important; }
-.pptx-host .pptx-preview-slide-wrapper { margin-bottom: 14px !important; box-shadow: 0 1px 3px rgb(0 0 0 / .12), 0 6px 20px rgb(0 0 0 / .06); }
+.pptx-host .sv-list { align-items: center; align-items: safe center; }
 .slide .sl { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-bottom: 6px; }
 .slide p { margin: 0 0 6px; }
 .slide p:first-of-type { font-weight: 600; font-size: 18px; }
@@ -223,7 +222,8 @@ const CDN = {
   zip: ['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'],
   docx: ['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', 'https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js'],
   xlsx: ['https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'],
-  pptx: ['https://cdn.jsdelivr.net/npm/pptx-preview@1.0.7/dist/pptx-preview.umd.js'],
+  // slides.js — своя отрисовка слайдов, лежит рядом со страницей
+  pptx: ['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', 'slides.js'],
 };
 // Inside the Android app the libraries ship with the APK, so documents open offline.
 // RUST — версия на Tauri: распознавание форматов и чтение .doc там делает код на Rust.
@@ -234,7 +234,7 @@ const invoke = (cmd, args) => window.__TAURI__.core.invoke(cmd, args);
 const RUST_MAX_BYTES = 16 * 1048576;
 const loading = {};
 function loadScript(src) {
-  if (IN_APP) src = 'libs/' + src.split('/').pop();
+  if (IN_APP && src.includes('://')) src = 'libs/' + src.split('/').pop();
   return loading[src] || (loading[src] = new Promise((res, rej) => {
     const s = document.createElement('script');
     s.src = src; s.onload = res;
@@ -597,21 +597,16 @@ async function showPptx(buf) {
   try {
     await need('pptx');
     view.innerHTML = '<div class="pptx-host" id="ph"></div>';
-    const host = $('#ph');
-    let viewer = null;
-    const draw = async () => {
-      if (viewer) { try { viewer.destroy(); } catch (e) {} }
-      host.innerHTML = '';
-      const w = Math.round(Math.min(view.clientWidth - 32, 1100) * zoom());
-      viewer = pptxPreview.init(host, { width: w, height: Math.round(w * 9 / 16), mode: 'list' });
-      await viewer.preview(buf.slice(0));
-      setMeta(viewer.slideCount + ' ' + plural(viewer.slideCount, 'слайд', 'слайда', 'слайдов'));
-    };
-    state.cleanup.push(() => { if (viewer) viewer.destroy(); });
-    await draw();
-    if (!host.querySelector('.pptx-preview-slide-wrapper')) throw new Error('empty');
+    const baseW = () => Math.min(view.clientWidth - 32, 1100);
+    const slides = await PptxView.render(buf, $('#ph'), { width: baseW() * zoom() });
+    state.cleanup.push(() => slides.dispose());
+    if (!slides.count) { status('Презентация пустая', 'В этом файле нет ни одного слайда.'); return; }
+    setMeta(slides.count + ' ' + plural(slides.count, 'слайд', 'слайда', 'слайдов'));
     setZoomUI(true);
-    state.onZoom = draw;
+    state.onZoom = () => slides.setWidth(baseW() * zoom());
+    const onR = () => slides.setWidth(baseW() * zoom());
+    window.addEventListener('resize', onR);
+    state.cleanup.push(() => window.removeEventListener('resize', onR));
   } catch (e) {
     console.warn('pptx render failed, showing text', e);
     await showPptxText(buf);

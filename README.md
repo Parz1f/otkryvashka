@@ -29,7 +29,8 @@
 
 - `web/otkryvashka.html` — сам просмотрщик (веб-страница).
 - `tools/build_www.py` — превращает её в стартовую страницу приложения (`app/src/main/assets/www/index.html`). Запускать после правок страницы.
-- `app/src/main/assets/www/libs` — библиотеки просмотра: pdf.js, docx-preview, SheetJS, pptx-preview, JSZip.
+- `web/slides.js` — своя отрисовка презентаций: фигуры, текст, картинки, таблицы, группы, SmartArt и графики (столбцы, линии, области, круговые, кольцевые, точечные, пузырьковые, лепестковые) по данным из файла.
+- `app/src/main/assets/www/libs` — библиотеки просмотра: pdf.js, docx-preview, SheetJS, JSZip.
 - `app/src/main/java/.../MainActivity.java` — окно приложения: показывает страницу, выбор файлов, «Открыть с помощью» и кнопку «Назад».
 - `.github/workflows/build.yml` — GitHub сам собирает APK при каждом изменении и выкладывает его в Releases.
 

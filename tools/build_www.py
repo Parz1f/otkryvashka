@@ -33,4 +33,6 @@ title_end = page.index('</title>') + len('</title>')
 body_start = page.index('<header')
 html = head + page[:body_start] + '</head>\n<body>\n' + page[body_start:] + '\n</body>\n</html>\n'
 out.write_text(html, encoding='utf-8')
+# Своя отрисовка слайдов лежит рядом со страницей
+(out.parent / 'slides.js').write_text((root / 'web' / 'slides.js').read_text(encoding='utf-8'), encoding='utf-8')
 print('wrote', out.relative_to(root))
