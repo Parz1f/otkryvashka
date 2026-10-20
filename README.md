@@ -15,6 +15,16 @@
 - Нажмите «Выбрать файл» в приложении.
 - Или в любом приложении (файлы, Telegram, почта) нажмите на файл → «Открыть с помощью» → «Открывашка». Через «Поделиться» тоже работает.
 
+## Версия на Rust
+
+В папке `rust/` лежит та же Открывашка на [Tauri](https://tauri.app): оболочка и работа с файлами написаны на Rust.
+
+- Скачать: [Otkryvashka-Rust.apk](https://github.com/Parz1f/otkryvashka/releases/download/rust-latest/Otkryvashka-Rust.apk). В телефоне называется «Открывашка R» и ставится рядом с обычной.
+- `rust/core` — библиотека без Android: распознаёт формат файла по содержимому (`detect.rs`) и читает текст документов Word 97–2003 по их внутренней таблице кусков (`doc.rs`). Тесты: `cd rust && cargo test -p otkryvashka-core`.
+- `rust/src-tauri/src/lib.rs` — команды, которые вызывает страница: `detect_format`, `doc_text`, `incoming_info`, `take_incoming`, `quit`.
+- `rust/src-tauri/gen/android` — Android-проект Tauri. `MainActivity.kt` копирует файл из «Открыть с помощью» в кэш, откуда его читает Rust.
+- `.github/workflows/rust.yml` — сборка APK. Если она упадёт, лог окажется в ветке `ci-logs`.
+
 ## Как устроено
 
 - `web/otkryvashka.html` — сам просмотрщик (веб-страница).
