@@ -1,0 +1,774 @@
+<title>Открывашка</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=Unbounded:wght@600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-screen reader — slim toolbar on top, document stage fills the rest and scrolls. */
+:root {
+  --bg: #eef0f4;
+  --surface: #ffffff;
+  --fg: #171a21;
+  --muted: #5d6475;
+  --line: #d9dde6;
+  --accent: #2c46cf;
+  --accent-fg: #ffffff;
+  --pdf: #cf2f29;
+  --doc: #2a5bd6;
+  --xls: #1b8148;
+  --ppt: #c95a22;
+  --other: #6b5bd0;
+  --font-ui: "Golos Text", "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-logo: "Unbounded", "Golos Text", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101217; --surface: #1a1d25; --fg: #e8eaf1; --muted: #9ba2b4; --line: #2b303b;
+    --accent: #8d9dff; --accent-fg: #0d1030;
+    --pdf: #ff6d64; --doc: #7ea3ff; --xls: #51c985; --ppt: #ff9c5e; --other: #b3a7ff;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101217; --surface: #1a1d25; --fg: #e8eaf1; --muted: #9ba2b4; --line: #2b303b;
+  --accent: #8d9dff; --accent-fg: #0d1030;
+  --pdf: #ff6d64; --doc: #7ea3ff; --xls: #51c985; --ppt: #ff9c5e; --other: #b3a7ff;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 15px; line-height: 1.5;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, label:focus-within, .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Toolbar */
+.bar {
+  flex: none; display: flex; align-items: center; gap: 10px;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.logo { display: flex; align-items: center; gap: 9px; font-family: var(--font-logo); font-size: 16px; letter-spacing: -0.01em; white-space: nowrap; }
+.logo-mark { width: 26px; height: 26px; flex: none; }
+.back { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent; flex: none; }
+.back:hover { background: var(--bg); }
+.fileinfo { min-width: 0; flex: 1; display: flex; align-items: center; gap: 10px; }
+.fileinfo .names { min-width: 0; }
+.fname { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fmeta { font-family: var(--font-mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.badge {
+  flex: none; font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase;
+  color: #fff; background: var(--tc, var(--other)); padding: 3px 7px; border-radius: 6px;
+}
+.spacer { flex: 1; }
+.zoom { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; flex: none; }
+.zoom button { width: 34px; height: 34px; border: 0; background: transparent; font-size: 18px; line-height: 1; }
+.zoom span { min-width: 46px; text-align: center; font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.open-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 0 14px; height: 36px; border-radius: 10px;
+  background: var(--accent); color: var(--accent-fg); font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.open-btn input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+@media (max-width: 560px) {
+  .open-btn .t { display: none; }
+  .open-btn { padding: 0 10px; }
+  .zoom span { min-width: 40px; }
+  .viewing .logo { display: none; }
+  .bar { gap: 8px; }
+}
+
+/* Stage */
+#stage { flex: 1; overflow: auto; position: relative; -webkit-overflow-scrolling: touch; }
+.inner { padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Home */
+.home { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+.drop {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px;
+  padding: 44px 20px; border: 2px dashed var(--line); border-radius: 18px; background: var(--surface); cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.drop.over, .drop:hover { border-color: var(--accent); }
+.drop h1 { margin: 0; font-size: 22px; font-weight: 600; text-wrap: balance; line-height: 1.25; }
+.drop p { margin: 0; color: var(--muted); max-width: 40ch; }
+.stack { display: flex; }
+.stack .sheet {
+  width: 46px; height: 58px; border-radius: 6px; background: var(--surface); border: 1.5px solid var(--tc);
+  display: grid; place-items: end center; padding-bottom: 7px; margin: 0 -6px; box-shadow: 0 2px 8px rgb(0 0 0 / .08);
+  font-family: var(--font-mono); font-size: 10px; font-weight: 500; color: var(--tc);
+}
+.stack .sheet:nth-child(1) { transform: rotate(-9deg) translateY(4px); }
+.stack .sheet:nth-child(3) { transform: rotate(9deg) translateY(4px); }
+.stack .sheet:nth-child(2) { position: relative; z-index: 1; }
+.drop .open-btn { height: 44px; padding: 0 22px; font-size: 16px; }
+.drop .open-btn .t { display: inline; }
+.section-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); font-weight: 500;
+}
+.chip:hover { border-color: var(--tc); }
+.chip i { width: 9px; height: 9px; border-radius: 3px; background: var(--tc); }
+.formats { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.formats div { background: var(--surface); padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.formats b { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.formats b i { width: 9px; height: 9px; border-radius: 3px; background: var(--tc); flex: none; }
+.formats span { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.note { color: var(--muted); font-size: 13.5px; margin: 0; max-width: 62ch; }
+
+/* Status */
+.status { max-width: 520px; margin: 60px auto; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; color: var(--muted); }
+.status h2 { margin: 0; color: var(--fg); font-size: 18px; font-weight: 600; text-wrap: balance; }
+.status p { margin: 0; }
+.spin { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--accent); animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+
+/* PDF */
+.pdf-pages { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.pdf-page { background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / .12), 0 6px 20px rgb(0 0 0 / .06); position: relative; flex: none; }
+.pdf-page canvas { display: block; width: 100%; height: 100%; }
+.pdf-page .pn { position: absolute; bottom: -20px; right: 0; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.pager {
+  position: absolute; position: sticky; bottom: 14px; margin: 0 auto; width: max-content; z-index: 3;
+  font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums;
+  background: var(--fg); color: var(--bg); padding: 5px 12px; border-radius: 999px; opacity: .88;
+}
+
+/* DOCX */
+.docx-host { overflow-x: auto; }
+.docx-host .docx-wrapper { background: transparent !important; padding: 0 !important; gap: 16px; }
+.docx-host .docx-wrapper > section.docx { box-shadow: 0 1px 3px rgb(0 0 0 / .12), 0 6px 20px rgb(0 0 0 / .06) !important; margin-bottom: 16px !important; }
+
+/* Sheet */
+.tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 10px; }
+.tab { flex: none; padding: 7px 13px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; white-space: nowrap; }
+.tab[aria-selected="true"] { background: var(--xls); border-color: var(--xls); color: #fff; }
+.grid-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); max-height: calc(100vh - 190px); }
+table.grid { border-collapse: separate; border-spacing: 0; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.grid th, .grid td { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 5px 9px; white-space: nowrap; max-width: 360px; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.grid thead th { position: sticky; top: 0; z-index: 2; background: var(--bg); font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--muted); text-align: center; }
+.grid tbody th { position: sticky; left: 0; z-index: 1; background: var(--bg); font-family: var(--font-mono); font-size: 11px; font-weight: 400; color: var(--muted); text-align: right; min-width: 40px; }
+.grid thead th:first-child { left: 0; z-index: 3; }
+.grid td.n { text-align: right; }
+.grid-note { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+
+/* Text / slides / image */
+.textview { margin: 0 auto; max-width: 900px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; overflow-x: auto; font-family: var(--font-mono); font-size: 13px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+.slides { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.slide { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; max-width: 100%; }
+.pptx-host { overflow-x: auto; }
+.pptx-host .pptx-preview-wrapper { height: auto !important; overflow: visible !important; background: transparent !important; }
+.pptx-host .pptx-preview-slide-wrapper { margin-bottom: 14px !important; box-shadow: 0 1px 3px rgb(0 0 0 / .12), 0 6px 20px rgb(0 0 0 / .06); }
+.slide .sl { font-family: var(--font-mono); font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.slide p { margin: 0 0 6px; }
+.slide p:first-of-type { font-weight: 600; font-size: 18px; }
+.banner { max-width: 760px; margin: 0 auto 14px; font-size: 13.5px; color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
+.imgview { display: flex; justify-content: center; }
+.imgview img, .imgview video { display: block; max-width: none; border-radius: 6px; box-shadow: 0 2px 14px rgb(0 0 0 / .1); }
+.media { display: flex; justify-content: center; }
+.media audio { width: 100%; max-width: 520px; }
+
+.dragcover { position: fixed; inset: 0; z-index: 20; background: color-mix(in srgb, var(--accent) 14%, transparent); border: 3px dashed var(--accent); display: grid; place-items: center; font-size: 20px; font-weight: 600; color: var(--accent); pointer-events: none; }
+</style>
+
+<header class="bar" id="bar">
+  <button class="back" id="back" type="button" aria-label="На главный экран" hidden>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+  </button>
+  <div class="logo" id="logo">
+    <svg class="logo-mark" viewBox="0 0 26 26" aria-hidden="true"><path d="M6 2h10l6 6v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="var(--accent)"/><path d="M16 2v6h6" fill="none" stroke="var(--surface)" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 14.5h9M8.5 18h6" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round"/></svg>
+    <span class="logo-text">Открывашка</span>
+  </div>
+  <div class="fileinfo" id="fileinfo" hidden>
+    <span class="badge" id="fbadge">PDF</span>
+    <div class="names"><div class="fname" id="fname"></div><div class="fmeta" id="fmeta"></div></div>
+  </div>
+  <div class="spacer" id="spacer"></div>
+  <div class="zoom" id="zoom" hidden>
+    <button type="button" id="zout" aria-label="Уменьшить">−</button>
+    <span id="zval">100%</span>
+    <button type="button" id="zin" aria-label="Увеличить">+</button>
+  </div>
+  <label class="open-btn" id="openTop">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    <span class="t">Открыть файл</span>
+    <input type="file" id="fileTop" aria-label="Открыть файл">
+  </label>
+</header>
+
+<main id="stage"><div class="inner" id="view"></div></main>
+<div class="dragcover" id="dragcover" hidden>Отпустите файл, чтобы открыть</div>
+
+<script>
+(() => {
+'use strict';
+const $ = (s) => document.querySelector(s);
+const view = $('#view'), stage = $('#stage');
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ---------- Libraries, loaded only when a format needs them ---------- */
+const CDN = {
+  pdf: ['https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'],
+  zip: ['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'],
+  docx: ['https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js', 'https://cdn.jsdelivr.net/npm/docx-preview@0.3.2/dist/docx-preview.min.js'],
+  xlsx: ['https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'],
+  pptx: ['https://cdn.jsdelivr.net/npm/pptx-preview@1.0.7/dist/pptx-preview.umd.js'],
+};
+// Inside the Android app the libraries ship with the APK, so documents open offline.
+const IN_APP = location.hostname === 'appassets.androidplatform.net';
+const loading = {};
+function loadScript(src) {
+  if (IN_APP) src = 'libs/' + src.split('/').pop();
+  return loading[src] || (loading[src] = new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = res;
+    s.onerror = () => { delete loading[src]; rej(new Error('Не удалось загрузить модуль просмотра. Проверьте подключение к интернету и попробуйте снова.')); };
+    document.head.appendChild(s);
+  }));
+}
+async function need(name) { for (const src of CDN[name]) await loadScript(src); }
+
+/* ---------- Format detection ---------- */
+const TYPES = {
+  pdf:   { label: 'PDF',  color: 'var(--pdf)' },
+  docx:  { label: 'Word', color: 'var(--doc)' },
+  doc:   { label: 'DOC',  color: 'var(--doc)' },
+  sheet: { label: 'Excel', color: 'var(--xls)' },
+  pptx:  { label: 'PPT',  color: 'var(--ppt)' },
+  image: { label: 'Фото', color: 'var(--other)' },
+  video: { label: 'Видео', color: 'var(--other)' },
+  audio: { label: 'Аудио', color: 'var(--other)' },
+  text:  { label: 'Текст', color: 'var(--other)' },
+  rtf:   { label: 'RTF',  color: 'var(--doc)' },
+  unknown: { label: 'Файл', color: 'var(--muted)' },
+};
+const EXT = {
+  pdf: ['pdf'],
+  docx: ['docx', 'docm', 'dotx', 'dotm'],
+  doc: ['doc', 'dot'],
+  sheet: ['xlsx', 'xlsm', 'xlsb', 'xls', 'xlt', 'xltx', 'ods', 'fods', 'csv', 'tsv', 'numbers'],
+  pptx: ['pptx', 'ppsx', 'potx', 'pptm'],
+  image: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'avif', 'ico', 'heic', 'heif'],
+  video: ['mp4', 'webm', 'mov', 'm4v', 'ogv', '3gp'],
+  audio: ['mp3', 'wav', 'ogg', 'oga', 'm4a', 'aac', 'flac', 'opus'],
+  rtf: ['rtf'],
+  text: ['txt', 'md', 'markdown', 'json', 'xml', 'html', 'htm', 'css', 'js', 'ts', 'log', 'ini', 'cfg', 'conf', 'yml', 'yaml', 'py', 'java', 'kt', 'c', 'h', 'cpp', 'cs', 'go', 'rs', 'php', 'rb', 'sh', 'sql', 'srt', 'vtt', 'tex', 'toml', 'env', 'bat', 'ps1', 'swift', 'gradle', 'properties'],
+};
+function byExt(name, mime) {
+  const ext = (name.includes('.') ? name.split('.').pop() : '').toLowerCase();
+  for (const k in EXT) if (EXT[k].includes(ext)) return k;
+  if (mime === 'application/pdf') return 'pdf';
+  if (mime.startsWith('image/')) return 'image';
+  if (mime.startsWith('video/')) return 'video';
+  if (mime.startsWith('audio/')) return 'audio';
+  if (mime.startsWith('text/') || mime.includes('json') || mime.includes('xml')) return 'text';
+  return 'unknown';
+}
+// Files from messengers often come without an extension, so look at the first bytes too.
+async function sniff(buf) {
+  const b = new Uint8Array(buf.slice(0, 8));
+  const str = String.fromCharCode(...b);
+  if (str.startsWith('%PDF')) return 'pdf';
+  if (b[0] === 0x89 && str.slice(1, 4) === 'PNG') return 'image';
+  if (b[0] === 0xff && b[1] === 0xd8) return 'image';
+  if (str.startsWith('GIF8')) return 'image';
+  if (str.startsWith('{\\rtf')) return 'rtf';
+  if (b[0] === 0xd0 && b[1] === 0xcf && b[2] === 0x11 && b[3] === 0xe0) return 'ole';
+  if (b[0] === 0x50 && b[1] === 0x4b) {
+    try {
+      await need('zip');
+      const z = await JSZip.loadAsync(buf);
+      if (z.file('word/document.xml')) return 'docx';
+      if (z.file('xl/workbook.xml') || z.file('content.xml')) return 'sheet';
+      if (z.file('ppt/presentation.xml')) return 'pptx';
+    } catch (e) { /* not a readable zip */ }
+  }
+  return null;
+}
+
+/* ---------- State ---------- */
+const ZOOMS = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 2.5, 3];
+let state = { zoomIdx: 3, onZoom: null, cleanup: [] };
+const zoom = () => ZOOMS[state.zoomIdx];
+function setZoomUI(on) {
+  $('#zoom').hidden = !on;
+  $('#zval').textContent = Math.round(zoom() * 100) + '%';
+}
+$('#zin').onclick = () => { if (state.zoomIdx < ZOOMS.length - 1) { state.zoomIdx++; setZoomUI(true); state.onZoom && state.onZoom(); } };
+$('#zout').onclick = () => { if (state.zoomIdx > 0) { state.zoomIdx--; setZoomUI(true); state.onZoom && state.onZoom(); } };
+
+function reset() {
+  state.cleanup.forEach((f) => { try { f(); } catch (e) {} });
+  state = { zoomIdx: 3, onZoom: null, cleanup: [] };
+  setZoomUI(false);
+  stage.scrollTop = 0; stage.scrollLeft = 0;
+}
+
+function fmtSize(n) {
+  if (n < 1024) return n + ' Б';
+  if (n < 1048576) return (n / 1024).toFixed(n < 10240 ? 1 : 0).replace('.', ',') + ' КБ';
+  return (n / 1048576).toFixed(1).replace('.', ',') + ' МБ';
+}
+function showHeader(file, kind, extra) {
+  const t = TYPES[kind] || TYPES.unknown;
+  document.body.classList.add('viewing');
+  $('#back').hidden = false; $('#fileinfo').hidden = false; $('#spacer').hidden = true;
+  const badge = $('#fbadge'); badge.textContent = t.label; badge.style.setProperty('--tc', t.color);
+  $('#fname').textContent = file.name;
+  $('#fmeta').textContent = fmtSize(file.size) + (extra ? ' · ' + extra : '');
+}
+function setMeta(extra) { const f = state.file; if (f) $('#fmeta').textContent = fmtSize(f.size) + (extra ? ' · ' + extra : ''); }
+function status(title, text, busy) {
+  view.innerHTML = `<div class="status">${busy ? '<div class="spin"></div>' : ''}<h2>${esc(title)}</h2>${text ? `<p>${esc(text)}</p>` : ''}</div>`;
+}
+
+/* ---------- Home screen ---------- */
+function home() {
+  reset();
+  document.body.classList.remove('viewing');
+  $('#back').hidden = true; $('#fileinfo').hidden = true; $('#spacer').hidden = false;
+  view.innerHTML = `
+  <div class="home">
+    <label class="drop" id="drop">
+      <div class="stack" aria-hidden="true">
+        <div class="sheet" style="--tc:var(--pdf)">PDF</div>
+        <div class="sheet" style="--tc:var(--doc)">DOCX</div>
+        <div class="sheet" style="--tc:var(--xls)">XLSX</div>
+      </div>
+      <h1>Откройте любой документ</h1>
+      <p>Выберите файл в памяти телефона, в загрузках или в облаке. Файл никуда не отправляется и открывается прямо на устройстве.${IN_APP ? ' Ещё файл можно открыть из любого приложения через «Открыть с помощью».' : ''}</p>
+      <span class="open-btn"><span class="t">Выбрать файл</span></span>
+      <input type="file" id="fileHome" style="display:none">
+    </label>
+    <div>
+      <p class="section-label">Попробовать на примере</p>
+      <div class="chips">
+        <button class="chip" type="button" data-sample="pdf" style="--tc:var(--pdf)"><i></i>Пример PDF</button>
+        <button class="chip" type="button" data-sample="docx" style="--tc:var(--doc)"><i></i>Пример Word</button>
+        <button class="chip" type="button" data-sample="xlsx" style="--tc:var(--xls)"><i></i>Пример Excel</button>
+      </div>
+    </div>
+    <div>
+      <p class="section-label">Что открывается</p>
+      <div class="formats">
+        <div style="--tc:var(--pdf)"><b><i></i>PDF</b><span>.pdf</span></div>
+        <div style="--tc:var(--doc)"><b><i></i>Word</b><span>.docx · .doc · .rtf</span></div>
+        <div style="--tc:var(--xls)"><b><i></i>Таблицы</b><span>.xlsx · .xls · .ods · .csv</span></div>
+        <div style="--tc:var(--ppt)"><b><i></i>Презентации</b><span>.pptx · .ppsx</span></div>
+        <div style="--tc:var(--other)"><b><i></i>Фото и видео</b><span>.jpg · .png · .mp4 · .mp3</span></div>
+        <div style="--tc:var(--muted)"><b><i></i>Текст и код</b><span>.txt · .json · .xml · .md</span></div>
+      </div>
+    </div>
+    <p class="note">Старые форматы .doc показываются без оформления, только текст. Файлы с другими расширениями открываются как текст или в виде байтов.</p>
+  </div>`;
+  const drop = $('#drop');
+  $('#fileHome').onchange = (e) => e.target.files[0] && openFile(e.target.files[0]);
+  view.querySelectorAll('[data-sample]').forEach((b) => b.onclick = () => openSample(b.dataset.sample));
+  ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, () => drop.classList.remove('over')));
+}
+
+/* ---------- Open a file ---------- */
+async function openFile(file) {
+  reset();
+  state.file = file;
+  let kind = byExt(file.name, file.type || '');
+  showHeader(file, kind);
+  status('Открываю файл…', file.name, true);
+  try {
+    const buf = await file.arrayBuffer();
+    if (kind === 'unknown' || kind === 'text' || kind === 'doc') {
+      const s = await sniff(buf);
+      if (s === 'ole') { if (kind !== 'doc' && /\.(xls|xlt)$/i.test(file.name) === false) kind = kind === 'unknown' ? 'ole' : kind; }
+      else if (s) kind = s;
+    }
+    if (kind === 'ole') kind = await guessOle(buf);
+    showHeader(file, kind);
+    const run = { pdf: showPdf, docx: showDocx, doc: showDoc, sheet: showSheet, pptx: showPptx, image: showImage, video: showMedia, audio: showMedia, text: showText, rtf: showRtf }[kind] || showUnknown;
+    await run(buf, file, kind);
+  } catch (err) {
+    console.error(err);
+    const msg = err && err.name === 'PasswordException'
+      ? ['Файл защищён паролем', 'Этот PDF зашифрован. Снимите пароль в программе, где он создан, и откройте снова.']
+      : ['Не получилось открыть файл', (err && err.message) || 'Файл повреждён или его формат не поддерживается.'];
+    status(msg[0], msg[1]);
+  }
+}
+// Old binary Office files (.doc/.xls/.ppt) share one container; SheetJS can tell a workbook apart.
+async function guessOle(buf) {
+  try { await need('xlsx'); const wb = XLSX.read(buf, { type: 'array', bookSheets: true }); if (wb.SheetNames && wb.SheetNames.length) return 'sheet'; } catch (e) {}
+  return 'doc';
+}
+
+/* ---------- PDF ---------- */
+async function showPdf(buf) {
+  await need('pdf');
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf), isEvalSupported: false, disableFontFace: false }).promise;
+  state.cleanup.push(() => pdf.destroy());
+  setMeta(pdf.numPages + ' ' + plural(pdf.numPages, 'страница', 'страницы', 'страниц'));
+  setZoomUI(true);
+  view.innerHTML = '<div class="pdf-pages" id="pages"></div><div class="pager" id="pager"></div>';
+  const wrap = $('#pages'), pager = $('#pager');
+  const sizes = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const d = document.createElement('div');
+    d.className = 'pdf-page'; d.dataset.i = i;
+    d.innerHTML = `<span class="pn">${i}</span>`;
+    wrap.appendChild(d);
+  }
+  const first = (await pdf.getPage(1)).getViewport({ scale: 1 });
+  const baseWidth = () => Math.min(view.clientWidth - 32, 900);
+  const tasks = new Map();
+  function layout() {
+    wrap.querySelectorAll('.pdf-page').forEach((d) => {
+      const vp = sizes[d.dataset.i] || first;
+      const w = baseWidth() * zoom();
+      d.style.width = w + 'px'; d.style.height = (w * vp.height / vp.width) + 'px';
+      d.dataset.done = '';
+      const c = d.querySelector('canvas'); if (c) c.remove();
+    });
+  }
+  async function render(d) {
+    if (d.dataset.done) return;
+    d.dataset.done = '1';
+    const i = +d.dataset.i;
+    const page = await pdf.getPage(i);
+    const vp1 = page.getViewport({ scale: 1 });
+    if (!sizes[i]) { sizes[i] = vp1; }
+    const w = baseWidth() * zoom();
+    d.style.height = (w * vp1.height / vp1.width) + 'px';
+    const dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const vp = page.getViewport({ scale: (w / vp1.width) * dpr });
+    const c = document.createElement('canvas');
+    c.width = Math.floor(vp.width); c.height = Math.floor(vp.height);
+    const t = page.render({ canvasContext: c.getContext('2d'), viewport: vp });
+    tasks.set(i, t);
+    try { await t.promise; d.insertBefore(c, d.firstChild); } catch (e) { d.dataset.done = ''; }
+  }
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => { if (e.isIntersecting) render(e.target); });
+  }, { root: stage, rootMargin: '800px 0px' });
+  const seen = new IntersectionObserver((entries) => {
+    entries.forEach((e) => { if (e.isIntersecting) pager.textContent = `${e.target.dataset.i} / ${pdf.numPages}`; });
+  }, { root: stage, threshold: 0.4 });
+  state.cleanup.push(() => { io.disconnect(); seen.disconnect(); tasks.forEach((t) => t.cancel()); });
+  layout();
+  wrap.querySelectorAll('.pdf-page').forEach((d) => { io.observe(d); seen.observe(d); });
+  pager.textContent = `1 / ${pdf.numPages}`;
+  state.onZoom = () => {
+    const ratio = stage.scrollTop / Math.max(1, stage.scrollHeight);
+    tasks.forEach((t) => t.cancel()); tasks.clear();
+    layout();
+    stage.scrollTop = ratio * stage.scrollHeight;
+    wrap.querySelectorAll('.pdf-page').forEach((d) => { io.unobserve(d); io.observe(d); });
+  };
+}
+
+/* ---------- Word (.docx) ---------- */
+async function showDocx(buf) {
+  await need('docx');
+  view.innerHTML = '<div class="docx-host" id="dh"></div>';
+  const host = $('#dh');
+  await docx.renderAsync(buf, host, host, { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: true, experimental: true, useBase64URL: true });
+  const pages = host.querySelectorAll('section.docx').length;
+  if (pages) setMeta(pages + ' ' + plural(pages, 'страница', 'страницы', 'страниц'));
+  setZoomUI(true);
+  const fit = () => {
+    const sec = host.querySelector('section.docx');
+    const pw = sec ? sec.offsetWidth : 800;
+    const z = Math.min(1, (view.clientWidth - 32) / pw) * zoom();
+    host.querySelector('.docx-wrapper').style.zoom = z;
+  };
+  fit();
+  state.onZoom = fit;
+  const onR = () => fit(); window.addEventListener('resize', onR); state.cleanup.push(() => window.removeEventListener('resize', onR));
+}
+
+/* ---------- Old Word (.doc): text only ---------- */
+async function showDoc(buf) {
+  const text = extractDocText(new Uint8Array(buf));
+  if (!text.trim()) throw new Error('Не удалось извлечь текст из этого .doc файла. Пересохраните его в формате .docx.');
+  view.innerHTML = `<div class="banner">Старый формат Word: показан только текст, без оформления и картинок.</div><div class="textview" style="font-family:var(--font-ui);font-size:15px">${esc(text)}</div>`;
+}
+// Word 97–2003 stores text either as UTF-16LE or as cp1252/cp1251 bytes; collect long readable runs of both.
+function extractDocText(b) {
+  const isOk = (c) => c === 9 || c === 10 || c === 13 || (c >= 32 && c < 127) || (c >= 0x400 && c <= 0x4ff) || c === 0xa0 || c === 0xab || c === 0xbb || (c >= 0x2010 && c <= 0x2026) || c === 0x2116;
+  const runs = [];
+  let cur = '';
+  for (let i = 0; i + 1 < b.length; i += 2) {
+    const c = b[i] | (b[i + 1] << 8);
+    if (isOk(c)) cur += String.fromCharCode(c);
+    else { if (cur.length > 24 && /[\p{L}]{3}/u.test(cur)) runs.push(cur); cur = ''; }
+  }
+  if (cur.length > 24) runs.push(cur);
+  let out = runs.join('\n');
+  if (out.length < 200) {
+    const dec = new TextDecoder('windows-1251');
+    const s = dec.decode(b).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]+/g, '\u0000');
+    out = s.split('\u0000').filter((r) => r.length > 30 && /[\p{L}]{3}/u.test(r)).join('\n');
+  }
+  return out.replace(/\r/g, '\n').replace(/\n{3,}/g, '\n\n');
+}
+
+/* ---------- Spreadsheets ---------- */
+async function showSheet(buf, file) {
+  await need('xlsx');
+  const isText = /\.(csv|tsv)$/i.test(file.name);
+  let wb;
+  if (isText) wb = XLSX.read(decodeText(new Uint8Array(buf)), { type: 'string', cellDates: true });
+  else wb = XLSX.read(buf, { type: 'array', cellDates: true });
+  const names = wb.SheetNames;
+  setMeta(names.length + ' ' + plural(names.length, 'лист', 'листа', 'листов'));
+  view.innerHTML = `<div class="tabs" role="tablist" id="tabs">${names.map((n, i) => `<button class="tab" role="tab" type="button" data-i="${i}" aria-selected="${i === 0}">${esc(n)}</button>`).join('')}</div><div id="sheet"></div>`;
+  if (names.length < 2) $('#tabs').hidden = true;
+  const draw = (i) => {
+    view.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(+t.dataset.i === i)));
+    $('#sheet').innerHTML = sheetHtml(wb.Sheets[names[i]]);
+  };
+  view.querySelectorAll('.tab').forEach((t) => t.onclick = () => draw(+t.dataset.i));
+  draw(0);
+}
+function colName(n) { let s = ''; n++; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
+function sheetHtml(ws) {
+  if (!ws || !ws['!ref']) return '<div class="status"><h2>Лист пустой</h2></div>';
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '', blankrows: true });
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const startRow = range.s.r, startCol = range.s.c;
+  const LIMIT = 3000;
+  let cols = 0;
+  for (const r of rows) if (r.length > cols) cols = r.length;
+  cols = Math.min(Math.max(cols, 1), 200);
+  const shown = rows.slice(0, LIMIT);
+  let h = '<div class="grid-wrap"><table class="grid"><thead><tr><th></th>';
+  for (let c = 0; c < cols; c++) h += `<th>${colName(startCol + c)}</th>`;
+  h += '</tr></thead><tbody>';
+  const num = /^[-+]?[\d\s ]*[.,]?\d+([eE][-+]?\d+)?\s?%?$|^[-+]?[$€₽£]?\s?[\d\s ,.]+\s?[$€₽£р]?\.?$/;
+  shown.forEach((r, i) => {
+    h += `<tr><th>${startRow + i + 1}</th>`;
+    for (let c = 0; c < cols; c++) {
+      const v = r[c] == null ? '' : String(r[c]);
+      h += `<td${v && num.test(v.trim()) ? ' class="n"' : ''} title="${esc(v)}">${esc(v)}</td>`;
+    }
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
+  if (rows.length > LIMIT) h += `<p class="grid-note">Показаны первые ${LIMIT.toLocaleString('ru')} строк из ${rows.length.toLocaleString('ru')}.</p>`;
+  return h;
+}
+
+/* ---------- Presentations (.pptx) ---------- */
+async function showPptx(buf) {
+  try {
+    await need('pptx');
+    view.innerHTML = '<div class="pptx-host" id="ph"></div>';
+    const host = $('#ph');
+    let viewer = null;
+    const draw = async () => {
+      if (viewer) { try { viewer.destroy(); } catch (e) {} }
+      host.innerHTML = '';
+      const w = Math.round(Math.min(view.clientWidth - 32, 1100) * zoom());
+      viewer = pptxPreview.init(host, { width: w, height: Math.round(w * 9 / 16), mode: 'list' });
+      await viewer.preview(buf.slice(0));
+      setMeta(viewer.slideCount + ' ' + plural(viewer.slideCount, 'слайд', 'слайда', 'слайдов'));
+    };
+    state.cleanup.push(() => { if (viewer) viewer.destroy(); });
+    await draw();
+    if (!host.querySelector('.pptx-preview-slide-wrapper')) throw new Error('empty');
+    setZoomUI(true);
+    state.onZoom = draw;
+  } catch (e) {
+    console.warn('pptx render failed, showing text', e);
+    await showPptxText(buf);
+  }
+}
+// Fallback when a presentation cannot be drawn: the text of each slide.
+async function showPptxText(buf) {
+  await need('zip');
+  const z = await JSZip.loadAsync(buf);
+  const files = Object.keys(z.files).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+    .sort((a, b) => +a.match(/\d+/)[0] - +b.match(/\d+/)[0]);
+  setMeta(files.length + ' ' + plural(files.length, 'слайд', 'слайда', 'слайдов'));
+  const parser = new DOMParser();
+  let h = '<div class="banner">Эту презентацию не удалось нарисовать, поэтому показан текст каждого слайда.</div><div class="slides">';
+  for (let i = 0; i < files.length; i++) {
+    const xml = parser.parseFromString(await z.file(files[i]).async('string'), 'application/xml');
+    const paras = [...xml.getElementsByTagName('a:p')].map((p) => [...p.getElementsByTagName('a:t')].map((t) => t.textContent).join('')).filter((s) => s.trim());
+    h += `<div class="slide"><div class="sl">Слайд ${i + 1}</div>${paras.map((p) => `<p>${esc(p)}</p>`).join('') || '<p style="color:var(--muted);font-weight:400;font-size:14px">Без текста</p>'}</div>`;
+  }
+  view.innerHTML = h + '</div>';
+}
+
+/* ---------- Images, media ---------- */
+function blobUrl(buf, file) { const u = URL.createObjectURL(new Blob([buf], { type: file.type || '' })); state.cleanup.push(() => URL.revokeObjectURL(u)); return u; }
+async function showImage(buf, file) {
+  const u = blobUrl(buf, file);
+  view.innerHTML = `<div class="imgview"><img id="img" alt="${esc(file.name)}"></div>`;
+  const img = $('#img');
+  await new Promise((res, rej) => { img.onload = res; img.onerror = () => rej(new Error('Браузер не умеет показывать этот формат изображения (например, HEIC на Android). Сохраните фото в JPG.')); img.src = u; });
+  setMeta(img.naturalWidth + '×' + img.naturalHeight + ' пикс.');
+  setZoomUI(true);
+  const fit = () => {
+    const w = Math.min(img.naturalWidth, view.clientWidth - 32);
+    img.style.width = (w * zoom()) + 'px';
+  };
+  fit(); state.onZoom = fit;
+}
+async function showMedia(buf, file, kind) {
+  const u = blobUrl(buf, file);
+  view.innerHTML = kind === 'video'
+    ? `<div class="imgview"><video controls playsinline src="${u}" style="max-width:100%"></video></div>`
+    : `<div class="media"><audio controls src="${u}"></audio></div>`;
+}
+
+/* ---------- Text ---------- */
+function decodeText(b) {
+  if (b[0] === 0xff && b[1] === 0xfe) return new TextDecoder('utf-16le').decode(b);
+  if (b[0] === 0xfe && b[1] === 0xff) return new TextDecoder('utf-16be').decode(b);
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(b); }
+  catch (e) { return new TextDecoder('windows-1251').decode(b); }
+}
+async function showText(buf, file) {
+  const b = new Uint8Array(buf);
+  let t = decodeText(b.subarray(0, 3 * 1048576));
+  if (/\.json$/i.test(file.name)) { try { t = JSON.stringify(JSON.parse(t), null, 2); } catch (e) {} }
+  const lines = t.split('\n').length;
+  setMeta(lines.toLocaleString('ru') + ' ' + plural(lines, 'строка', 'строки', 'строк'));
+  view.innerHTML = `<div class="textview">${esc(t)}</div>` + (b.length > 3 * 1048576 ? '<p class="grid-note" style="text-align:center">Показаны первые 3 МБ файла.</p>' : '');
+}
+async function showRtf(buf) {
+  let s = decodeText(new Uint8Array(buf));
+  s = s.replace(/\\'([0-9a-f]{2})/gi, (_, h) => new TextDecoder('windows-1251').decode(new Uint8Array([parseInt(h, 16)])))
+    .replace(/\\u(-?\d+)\??/g, (_, n) => String.fromCharCode(n < 0 ? +n + 65536 : +n))
+    .replace(/\{\\\*[^{}]*\}/g, '').replace(/\{\\(fonttbl|colortbl|stylesheet|info)[\s\S]*?\}\s*\}/g, '')
+    .replace(/\\(par|line)\b ?/g, '\n').replace(/\\tab\b ?/g, '\t')
+    .replace(/\\[a-z]+-?\d* ?/gi, '').replace(/[{}]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+  view.innerHTML = `<div class="banner">RTF: показан текст документа без оформления.</div><div class="textview" style="font-family:var(--font-ui);font-size:15px">${esc(s)}</div>`;
+}
+
+/* ---------- Anything else ---------- */
+async function showUnknown(buf, file) {
+  const b = new Uint8Array(buf);
+  const head = b.subarray(0, 4096);
+  let printable = 0;
+  for (const c of head) if (c === 9 || c === 10 || c === 13 || c >= 32) printable++;
+  if (head.length && printable / head.length > 0.95 && !head.includes(0)) return showText(buf, file);
+  let hex = '';
+  const n = Math.min(b.length, 1024);
+  for (let i = 0; i < n; i += 16) {
+    const row = b.subarray(i, i + 16);
+    hex += i.toString(16).padStart(6, '0') + '  ' + [...row].map((x) => x.toString(16).padStart(2, '0')).join(' ').padEnd(48) + '  ' + [...row].map((x) => (x >= 32 && x < 127 ? String.fromCharCode(x) : '·')).join('') + '\n';
+  }
+  view.innerHTML = `<div class="banner">Этот формат нельзя показать как документ. Ниже первые ${n} байт файла, по ним можно понять, что внутри.</div><div class="textview" style="white-space:pre;word-break:normal">${esc(hex)}</div>`;
+}
+
+function plural(n, one, few, many) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+
+/* ---------- Built-in examples ---------- */
+async function openSample(kind) {
+  try {
+    if (kind === 'xlsx') {
+      await need('xlsx');
+      const wb = XLSX.utils.book_new();
+      const data = [
+        ['Пример: бюджет на месяц', '', '', ''],
+        ['Статья', 'План, ₽', 'Факт, ₽', 'Разница, ₽'],
+        ['Аренда', 35000, 35000, 0], ['Продукты', 18000, 21450, -3450], ['Транспорт', 4500, 3980, 520],
+        ['Связь и интернет', 1200, 1200, 0], ['Кафе', 6000, 7320, -1320], ['Спорт', 3500, 3500, 0],
+        ['Подарки', 5000, 2600, 2400], ['Итого', 73200, 75050, -1850],
+      ];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(data), 'Бюджет');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Дата', 'Покупка', 'Сумма, ₽'], ['01.10.2026', 'Продукты', 2340], ['03.10.2026', 'Такси', 610], ['05.10.2026', 'Кафе', 1250], ['08.10.2026', 'Продукты', 3115]]), 'Покупки');
+      const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+      return openFile(new File([out], 'Пример — бюджет.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+    }
+    if (kind === 'docx') {
+      await need('zip');
+      const z = new JSZip();
+      const p = (t, o = {}) => `<w:p><w:pPr>${o.center ? '<w:jc w:val="center"/>' : ''}<w:spacing w:after="160"/></w:pPr><w:r><w:rPr><w:rFonts w:ascii="Times New Roman" w:hAnsi="Times New Roman" w:cs="Times New Roman"/>${o.b ? '<w:b/>' : ''}<w:sz w:val="${o.sz || 24}"/></w:rPr><w:t xml:space="preserve">${esc(t)}</w:t></w:r></w:p>`;
+      const body = [
+        p('ПРИМЕР ДОКУМЕНТА', { center: true, b: true, sz: 32 }),
+        p('Служебная записка', { center: true, sz: 26 }),
+        p('Так выглядит документ Word, открытый в Открывашке. Сохраняются шрифты, отступы, жирный текст, выравнивание и разбиение на страницы.'),
+        p('1. Откройте файл кнопкой «Открыть файл» в правом верхнем углу.', {}),
+        p('2. Увеличьте или уменьшите масштаб кнопками «+» и «−».', {}),
+        p('3. Чтобы вернуться к списку форматов, нажмите стрелку слева.', {}),
+        p('Дата: 20 октября 2026 г.', {}),
+      ].join('');
+      z.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');
+      z.file('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');
+      z.file('word/_rels/document.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>');
+      z.file('word/document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="850" w:bottom="1134" w:left="1701" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`);
+      const out = await z.generateAsync({ type: 'uint8array' });
+      return openFile(new File([out], 'Пример — записка.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+    }
+    if (kind === 'pdf') return openFile(new File([samplePdf()], 'Пример — брошюра.pdf', { type: 'application/pdf' }));
+  } catch (e) { status('Не получилось открыть пример', e.message); }
+}
+// A two-page PDF assembled by hand, with a correct cross-reference table.
+function samplePdf() {
+  const pageContent = (n) => [
+    '0.17 0.27 0.81 rg 0 742 595 100 re f',
+    'BT /F1 28 Tf 1 1 1 rg 56 780 Td (Sample PDF) Tj ET',
+    `BT /F1 12 Tf 1 1 1 rg 56 758 Td (Page ${n} of 2) Tj ET`,
+    'BT /F1 13 Tf 0.1 0.1 0.12 rg 56 690 Td 18 TL',
+    '(This is an example PDF document opened in the app.) Tj T*',
+    '(Pinch or use the + and - buttons to zoom.) Tj T*',
+    '(Scroll down to see the next page.) Tj ET',
+    '0.85 0.87 0.92 RG 1 w 56 600 m 539 600 l S',
+    ...[0, 1, 2, 3, 4].map((i) => `0.${3 + i} 0.${5 + (i % 3)} 0.8 rg ${70 + i * 95} 420 70 ${60 + i * 30} re f`),
+    'BT /F1 10 Tf 0.4 0.42 0.47 rg 56 400 Td (Quarterly figures, sample chart) Tj ET',
+  ].join('\n');
+  const objs = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 6 0 R >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 7 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  [1, 2].forEach((n) => { const c = pageContent(n); objs.push(`<< /Length ${c.length} >>\nstream\n${c}\nendstream`); });
+  let out = '%PDF-1.4\n';
+  const offs = [];
+  objs.forEach((o, i) => { offs.push(out.length); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
+  const x = out.length;
+  out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offs.map((o) => String(o).padStart(10, '0') + ' 00000 n \n').join('');
+  out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${x}\n%%EOF`;
+  return new TextEncoder().encode(out);
+}
+
+/* ---------- Wiring ---------- */
+$('#fileTop').onchange = (e) => { if (e.target.files[0]) openFile(e.target.files[0]); e.target.value = ''; };
+$('#back').onclick = home;
+let dragDepth = 0;
+window.addEventListener('dragenter', (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { dragDepth++; $('#dragcover').hidden = false; } });
+window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; $('#dragcover').hidden = true; } });
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => { e.preventDefault(); dragDepth = 0; $('#dragcover').hidden = true; const f = e.dataTransfer?.files?.[0]; if (f) openFile(f); });
+window.addEventListener('paste', (e) => { const f = e.clipboardData?.files?.[0]; if (f) openFile(f); });
+
+// Hooks for the Android app: files opened via "Open with" and the system Back button.
+window.openFromApp = async (name, mime, n) => {
+  try {
+    const r = await fetch('/incoming/' + n);
+    if (!r.ok) throw new Error('Нет доступа к файлу. Попробуйте открыть его через кнопку «Открыть файл».');
+    openFile(new File([await r.blob()], name || 'Файл', { type: mime || '' }));
+  } catch (e) { status('Не получилось открыть файл', e.message); }
+};
+window.appBack = () => {
+  if (!document.body.classList.contains('viewing')) return false;
+  home();
+  return true;
+};
+
+home();
+})();
+</script>

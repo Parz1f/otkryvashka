@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A sheet of paper with a folded corner and two text lines, inside the 66dp safe zone -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M40,30h20l12,12v32a4,4 0,0 1,-4 4H40a4,4 0,0 1,-4 -4V34a4,4 0,0 1,4 -4z" />
+    <path
+        android:fillColor="#B9C3F5"
+        android:pathData="M60,30l12,12H62a2,2 0,0 1,-2 -2z" />
+    <path
+        android:strokeColor="#2C46CF"
+        android:strokeWidth="3.4"
+        android:strokeLineCap="round"
+        android:pathData="M43,55h22M43,63h14" />
+</vector>
