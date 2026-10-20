@@ -30,13 +30,14 @@ jobs:
     defaults:
       run:
         working-directory: rust
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - uses: actions/setup-node@v4
         with:
@@ -53,22 +54,19 @@ jobs:
           jq '.version = "1.0.${{ github.run_number }}"' src-tauri/tauri.conf.json > conf.tmp
           mv conf.tmp src-tauri/tauri.conf.json
 
-      - name: Создать Android-проект (если его ещё нет)
-        run: |
-          if [ ! -d src-tauri/gen/android ]; then
-            npx -y @tauri-apps/cli@2.12.1 android init --ci
-          fi
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: gen-android
-          path: |
-            rust/src-tauri/gen/android
-            !rust/src-tauri/gen/android/**/build
-            !rust/src-tauri/gen/android/.gradle
-
       - name: Собрать APK
-        run: npx -y @tauri-apps/cli@2.12.1 android build --apk --target aarch64 armv7 --ci
+        run: npx -y @tauri-apps/cli@2.12.1 android build --apk --target aarch64 armv7 --ci 2>&1 | tee build.log
+
+      # Лог сборки в отдельную ветку ci-logs: так его можно прочитать через git
+      - name: Сохранить лог ошибки
+        if: failure()
+        run: |
+          mkdir -p /tmp/ci-logs && cd /tmp/ci-logs
+          git init -q -b ci-logs
+          tail -c 300000 "$GITHUB_WORKSPACE/rust/build.log" > build.log 2>/dev/null || echo "нет лога" > build.log
+          git add build.log
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "Лог сборки ${{ github.run_number }}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" ci-logs
 
       - name: Подписать
         run: |
