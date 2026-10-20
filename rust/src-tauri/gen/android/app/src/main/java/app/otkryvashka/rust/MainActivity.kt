@@ -33,7 +33,8 @@ class MainActivity : TauriActivity() {
    * пишется последним, поэтому Rust никогда не увидит недокопированный файл.
    */
   private fun receive(intent: Intent?) {
-    val uri: Uri = when (intent?.action) {
+    if (intent == null) return
+    val uri: Uri = when (intent.action) {
       Intent.ACTION_VIEW -> intent.data
       Intent.ACTION_SEND ->
         if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
