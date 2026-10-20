@@ -1,0 +1,11 @@
+{
+  "name": "otkryvashka-rust",
+  "private": true,
+  "description": "Только для сборки: Tauri CLI, который вызывает Android-сборка",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.12.1"
+  }
+}

@@ -5,3 +5,4 @@ local.properties
 .idea/
 rust/target/
 rust/src-tauri/gen/schemas/
+node_modules/

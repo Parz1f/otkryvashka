@@ -54,8 +54,11 @@ jobs:
           jq '.version = "1.0.${{ github.run_number }}"' src-tauri/tauri.conf.json > conf.tmp
           mv conf.tmp src-tauri/tauri.conf.json
 
+      - name: Tauri CLI
+        run: npm ci
+
       - name: Собрать APK
-        run: npx -y @tauri-apps/cli@2.12.1 android build --apk --target aarch64 armv7 --ci 2>&1 | tee build.log
+        run: npm run tauri -- android build --apk --target aarch64 armv7 --ci 2>&1 | tee build.log
 
       # Лог сборки в отдельную ветку ci-logs: так его можно прочитать через git
       - name: Сохранить лог ошибки
